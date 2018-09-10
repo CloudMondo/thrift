@@ -34,7 +34,13 @@ Brought to you by [FiscalNote, Inc](http://www.fiscalnote.com/)
 ##### Cocoapods
 Add the following to your podfile
 ```ruby
-    pod 'Thrift-swift3', :git => 'git@github.com:apache/thrift.git', :branch => 'master'
+    pod 'Thrift', :git => 'git@github.com:apache/thrift.git', :branch => 'master'
+```
+
+##### Carthage
+
+```ruby
+    github "apocolipse/Thrift-Swift"
 ```
 
 ##### SPM
