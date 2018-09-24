@@ -970,7 +970,7 @@ void t_swift_generator::generate_swift_union_reader(ostream &out, t_struct *tstr
   const vector<t_field *> &fields = tstruct->get_members();
   vector<t_field *>::const_iterator f_iter;
   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
-    indent(out) << "case (" << (*f_iter)->get_key() << ", " << type_to_enum((*f_iter)->get_type()) << "):";// << endl;
+    indent(out) << "case (" << (*f_iter)->get_key() << ", " << type_to_enum((*f_iter)->get_type()) << "):";
     string padding = "";
 
     t_type *type = get_true_type((*f_iter)->get_type());
@@ -1071,7 +1071,7 @@ void t_swift_generator::generate_swift_struct_reader(ostream &out,
 
   // Generate deserialization code for known cases
   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
-    indent(out) << "case (" << (*f_iter)->get_key() << ", " << type_to_enum((*f_iter)->get_type()) << "):";// << endl;
+    indent(out) << "case (" << (*f_iter)->get_key() << ", " << type_to_enum((*f_iter)->get_type()) << "):";
     string padding = "";
 
     t_type *type = get_true_type((*f_iter)->get_type());
@@ -1814,7 +1814,14 @@ void t_swift_generator::generate_swift_service_server_implementation(ostream &ou
       vector<t_field *>::const_iterator x_iter;
 
       for (x_iter = xfields.begin(); x_iter != xfields.end(); ++x_iter) {
-        indent(out) << "catch let error as " << (*x_iter)->get_type()->get_name();
+        indent(out) << "catch let error as ";
+
+        t_program *program = (*x_iter)->get_type()->get_program();
+        if ((*x_iter)->get_type()->get_name() == "Error" && module_namespacing_ && program != program_) {
+          out << get_real_swift_module(program) << ".";
+        }
+        out << (*x_iter)->get_type()->get_name();
+
         out << " { result." << (*x_iter)->get_name() << " = error }" << endl;
       }
 
