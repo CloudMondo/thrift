@@ -20,7 +20,7 @@
 AC_PREREQ(2.65)
 AC_CONFIG_MACRO_DIR([./aclocal])
 
-AC_INIT([thrift], [1.0.0-dev])
+AC_INIT([thrift], [1.0.0])
 
 AC_CONFIG_AUX_DIR([.])
 
@@ -109,6 +109,8 @@ fi
 
 AM_EXTRA_RECURSIVE_TARGETS([style])
 AC_SUBST(CPPSTYLE_CMD, 'find . -type f \( -iname "*.h" -or -iname "*.cpp" -or -iname "*.cc" -or -iname "*.tcc" \) -printf "Reformatting: %h/%f\n" -exec clang-format -i {} \;')
+# '
+# The above comment is to fix editor syntax highlighting
 
 AC_ARG_ENABLE([libs],
   AS_HELP_STRING([--enable-libs], [build the Apache Thrift libraries [default=yes]]),
@@ -136,8 +138,10 @@ if test "$enable_libs" = "no"; then
   with_go="no"
   with_d="no"
   with_nodejs="no"
+  with_nodets="no"
   with_lua="no"
   with_rs="no"
+  with_swift="no"
 fi
 
 AX_THRIFT_LIB(cpp, [C++], yes)
@@ -279,6 +283,18 @@ fi
 AM_CONDITIONAL(WITH_NODEJS, [test "$have_nodejs" = "yes"])
 AM_CONDITIONAL(HAVE_NPM, [test "x$NPM" != "x"])
 
+AX_THRIFT_LIB(nodets, [Nodets], yes)
+have_nodets=no
+if test "$with_nodets" = "yes"; then
+  AC_PATH_PROGS([NODETS], [nodets node])
+  AC_PATH_PROG([NPM], [npm])
+  if test "x$NODETS" != "x" -a "x$NPM" != "x"; then
+    have_nodets="yes"
+  fi
+fi
+AM_CONDITIONAL(WITH_NODETS, [test "$have_nodets" = "yes"])
+AM_CONDITIONAL(HAVE_NPM, [test "x$NPM" != "x"])
+
 AX_THRIFT_LIB(lua, [Lua], yes)
 have_lua=no
 if test "$with_lua" = "yes"; then
@@ -309,10 +325,13 @@ AM_CONDITIONAL(WITH_TWISTED_TEST, [test "$have_trial" = "yes"])
 # It's distro specific and far from ideal but needed to cross test py2-3 at once.
 # TODO: find "python2" if it's 3.x
 have_py3="no"
-if python --version 2>&1 | grep -q "Python 2"; then
-  AC_PATH_PROGS([PYTHON3], [python3 python3.5 python35 python3.4 python34])
-  if test -n "$PYTHON3"; then
-    have_py3="yes"
+AX_THRIFT_LIB(py3, [Py3], yes)
+if test "$with_py3" = "yes"; then
+  if $PYTHON --version 2>&1 | grep -q "Python 2"; then
+    AC_PATH_PROGS([PYTHON3], [python3 python3.7 python37 python3.6 python36 python3.5 python35 python3.4 python34])
+    if test -n "$PYTHON3"; then
+      have_py3="yes"
+    fi
   fi
 fi
 AM_CONDITIONAL(WITH_PY3, [test "$have_py3" = "yes"])
@@ -429,6 +448,16 @@ if test "$with_go" = "yes";  then
 fi
 AM_CONDITIONAL(WITH_GO, [test "$have_go" = "yes"])
 AM_CONDITIONAL([GOVERSION_LT_17], [test "$go_version_lt_17" = "yes"])
+
+AX_THRIFT_LIB(swift, [Swift], yes)
+have_swift="no"
+if test "$with_swift" = "yes"; then
+  AC_PATH_PROG([SWIFT], [swift])
+  if test "x$SWIFT" != "x" -a "x$SWIFT" != "x"; then
+    have_swift="yes"
+  fi
+fi
+AM_CONDITIONAL([WITH_SWIFT], [test "$have_swift" = "yes"])
 
 AX_THRIFT_LIB(rs, [Rust], yes)
 have_rs="no"
@@ -640,6 +669,7 @@ AC_CHECK_HEADERS([sys/ioctl.h])
 AC_CHECK_HEADERS([sys/socket.h])
 AC_CHECK_HEADERS([sys/time.h])
 AC_CHECK_HEADERS([sys/un.h])
+AC_CHECK_HEADERS([poll.h])
 AC_CHECK_HEADERS([sys/poll.h])
 AC_CHECK_HEADERS([sys/resource.h])
 AC_CHECK_HEADERS([unistd.h])
@@ -824,6 +854,7 @@ AC_CONFIG_FILES([
   lib/json/test/Makefile
   lib/netcore/Makefile
   lib/nodejs/Makefile
+  lib/nodets/Makefile
   lib/perl/Makefile
   lib/perl/test/Makefile
   lib/php/Makefile
@@ -834,6 +865,7 @@ AC_CONFIG_FILES([
   lib/rs/Makefile
   lib/rs/test/Makefile
   lib/lua/Makefile
+  lib/swift/Makefile
   lib/xml/Makefile
   lib/xml/test/Makefile
   test/Makefile
@@ -904,12 +936,16 @@ if test "$have_go" = "yes" ; then MAYBE_GO="go" ; else MAYBE_GO="" ; fi
 AC_SUBST([MAYBE_GO])
 if test "$have_nodejs" = "yes" ; then MAYBE_NODEJS="nodejs" ; else MAYBE_NODEJS="" ; fi
 AC_SUBST([MAYBE_NODEJS])
+if test "$have_nodets" = "yes" ; then MAYBE_NODETS="nodets" ; else MAYBE_NODETS="" ; fi
+AC_SUBST([MAYBE_NODETS])
 if test "$have_erlang" = "yes" ; then MAYBE_ERLANG="erl" ; else MAYBE_ERLANG="" ; fi
 AC_SUBST([MAYBE_ERLANG])
 if test "$have_lua" = "yes" ; then MAYBE_LUA="lua" ; else MAYBE_LUA="" ; fi
 AC_SUBST([MAYBE_LUA])
 if test "$have_rs" = "yes" ; then MAYBE_RS="rs" ; else MAYBE_RS="" ; fi
 AC_SUBST([MAYBE_RS])
+if test "$have_swift" = "yes" ; then MAYBE_SWIFT="swift" ; else MAYBE_SWIFT="" ; fi
+AC_SUBST([MAYBE_SWIFT])
 if test "$have_dotnetcore" = "yes" ; then MAYBE_DOTNETCORE="netcore" ; else MAYBE_DOTNETCORE="" ; fi
 AC_SUBST([MAYBE_DOTNETCORE])
 if test "$have_cl" = "yes" ; then MAYBE_CL="cl" ; else MAYBE_CL="" ; fi
@@ -942,6 +978,7 @@ echo "Building Python Library ...... : $have_python"
 echo "Building Py3 Library ......... : $have_py3"
 echo "Building Ruby Library ........ : $have_ruby"
 echo "Building Rust Library ........ : $have_rs"
+echo "Building Swift Library ....... : $have_swift"
 
 if test "$have_csharp" = "yes" ; then
   echo
@@ -1070,6 +1107,12 @@ if test "$have_rs" = "yes" ; then
   echo "   Using Cargo................ : $CARGO"
   echo "   Using rustc................ : $RUSTC"
   echo "   Using Rust version......... : $($RUSTC --version)"
+fi
+if test "$have_swift" = "yes" ; then
+  echo
+  echo "Swift Library:"
+  echo "   Using Swift ............... : $SWIFT"
+  echo "   Using Swift version ....... : $($SWIFT --version | head -1)"
 fi
 echo
 echo "If something is missing that you think should be present,"
