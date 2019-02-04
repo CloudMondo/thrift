@@ -334,13 +334,16 @@ void t_swift_generator::init_generator() {
   string out_dir = get_out_dir();
   string module_path = out_dir;
   string name = capitalize(program_name_);
-  if (module_namespacing_ && !module.empty()) {
-    module_path = module_path + "/" + module;
-    name = capitalize(module);
-  }
 
-  if (struct_namespacing_ && !module.empty()) {
+    if (!module.empty()) {
+        if (module_namespacing_) {
+    module_path = module_path + "/" + module;
+            name = module;
+  }
+        else if (struct_namespacing_) {
+            name = module;
     open_struct_namespace_ = true;
+        }+
   }
 
   MKDIR(module_path.c_str());
