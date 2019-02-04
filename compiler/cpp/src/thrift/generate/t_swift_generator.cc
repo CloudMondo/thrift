@@ -23,7 +23,6 @@
 #include <vector>
 #include <set>
 
-#include <stdlib.h>
 #include <sys/stat.h>
 #include <sstream>
 #include "thrift/platform.h"
@@ -63,21 +62,21 @@ public:
       for (iter = parsed_options.begin(); iter != parsed_options.end(); ++iter) {
             if (iter->first == "async_clients") {
           async_clients_ = true;
-        } else if (iter->first.compare("debug_descriptions") == 0) {
+            } else if (iter->first == "debug_descriptions") {
           debug_descriptions_ = true;
-        } else if (iter->first.compare("namespacing") == 0) {
-          if (iter->second.compare("module") == 0) {
+            } else if (iter->first == "namespacing") {
+                if (iter->second == "module") {
             module_namespacing_ = true;
-          } else if (iter->second.compare("struct") == 0) {
+                } else if (iter->second == "struct") {
             struct_namespacing_ = true;
           }
 
-          if (module_namespacing_ == true && struct_namespacing_ == true) {
+                if (module_namespacing_ && struct_namespacing_) {
             throw "Namespacing can have only one option, not both!";
           }
-        } else if (iter->first.compare("prefix_reserved_words") == 0) {
+            } else if (iter->first == "prefix_reserved_words") {
           reserved_words_prefix_ = iter->second;
-        } else if (iter->first.compare("safe_enums") == 0) {
+            } else if (iter->first == "safe_enums") {
           safe_enums_ = true;
         } else {
           throw "Unknown option:" + iter->first;
