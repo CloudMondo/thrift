@@ -2380,6 +2380,8 @@ void t_swift_generator::populate_reserved_words() {
   swift_reserved_words_.insert("where");
   swift_reserved_words_.insert("while");
   swift_reserved_words_.insert("willSet");
+    swift_reserved_words_.insert("prime");
+    swift_reserved_words_.insert("result");
 }
 
 string t_swift_generator::sanitize_identifier(const string &identifier) {
