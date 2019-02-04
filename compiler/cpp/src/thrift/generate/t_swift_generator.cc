@@ -78,6 +78,8 @@ public:
           reserved_words_prefix_ = iter->second;
             } else if (iter->first == "safe_enums") {
           safe_enums_ = true;
+            } else if (iter->first == "force_optionals") {
+                force_optionals_ = true;
         } else {
           throw "Unknown option:" + iter->first;
         }
@@ -252,7 +254,12 @@ private:
     }
 
     bool field_is_optional(t_field *tfield) {
+        if (force_optionals_) {
+            return true;
+        }
+
       bool is_optional = tfield->get_req() == t_field::T_OPTIONAL;
+
       if (tfield->annotations_.find("swift.nullable") != tfield->annotations_.end() &&
           tfield->get_req() != t_field::T_REQUIRED) {
         is_optional = true;
@@ -312,7 +319,9 @@ private:
     bool module_namespacing_;
 
     bool safe_enums_;
-    /** Struct namespacing */
+    bool force_optionals_;
+
+    /** Structure namespacing */
     bool struct_namespacing_;
     bool open_struct_namespace_;
 
@@ -342,7 +351,7 @@ void t_swift_generator::init_generator() {
         else if (struct_namespacing_) {
             name = module;
     open_struct_namespace_ = true;
-        }+
+        }
   }
 
   MKDIR(module_path.c_str());
@@ -2434,10 +2443,11 @@ THRIFT_REGISTER_GENERATOR(
         "    debug_descriptions:\n"
         "                     Allow use of debugDescription so the app can add description via a category/extension\n"
         "    async_clients:   Generate clients which invoke asynchronously via block syntax.\n"
-        "    namespacing=[module|struct]\n"
+        "    namespacing=[module|struct]:\n"
         "                     Generate Swift code using namespacing."
         "                     module: Generate sources in module scoped output directories.\n"
         "                     struct: Use structs as wrappers.\n"
+        "    force_optionals: Force generating all fields as Swift optionals."
         "    prefix_reserved_words:\n"
         "                     Prefix any reserved words instead of escaping them.\n"
         "    safe_enums:      Generate enum types with an unknown case to handle unspecified values rather than throw a serialization error\n")
