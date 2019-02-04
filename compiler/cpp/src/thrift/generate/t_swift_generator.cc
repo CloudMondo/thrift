@@ -53,7 +53,6 @@ public:
       (void) option_string;
       map<string, string>::const_iterator iter;
 
-      log_unexpected_ = false;
       async_clients_ = false;
       debug_descriptions_ = false;
       module_namespacing_ = false;
@@ -62,9 +61,7 @@ public:
       safe_enums_ = false;
 
       for (iter = parsed_options.begin(); iter != parsed_options.end(); ++iter) {
-        if (iter->first.compare("log_unexpected") == 0) {
-          log_unexpected_ = true;
-        } else if (iter->first.compare("async_clients") == 0) {
+            if (iter->first == "async_clients") {
           async_clients_ = true;
         } else if (iter->first.compare("debug_descriptions") == 0) {
           debug_descriptions_ = true;
@@ -310,8 +307,6 @@ private:
     ofstream_with_content_based_conditional_update f_impl_;
 
 
-/** */
-    bool log_unexpected_;
     bool async_clients_;
 
     bool debug_descriptions_;
@@ -2434,7 +2429,6 @@ string t_swift_generator::type_to_enum(t_type *type, bool qualified) {
 THRIFT_REGISTER_GENERATOR(
         swift,
         "Swift",
-        "    log_unexpected:  Log every time an unexpected field ID or type is encountered.\n"
         "    debug_descriptions:\n"
         "                     Allow use of debugDescription so the app can add description via a category/extension\n"
         "    async_clients:   Generate clients which invoke asynchronously via block syntax.\n"
