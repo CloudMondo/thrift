@@ -321,9 +321,6 @@ private:
     set<string> swift_reserved_words_;
     string reserved_words_prefix_;
 
-    /** Swift 2/Cocoa compatibility */
-    bool gen_cocoa_;
-
     string function_access_modifier(bool is_private) const;
 };
 
@@ -965,7 +962,8 @@ void t_swift_generator::generate_swift_union_reader(ostream &out, t_struct *tstr
   const vector<t_field *> &fields = tstruct->get_members();
   vector<t_field *>::const_iterator f_iter;
   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
-    indent(out) << "case (" << (*f_iter)->get_key() << ", " << type_to_enum((*f_iter)->get_type()) << "):";// << endl;
+        indent(out) << "case (" << (*f_iter)->get_key() << ", " << type_to_enum((*f_iter)->get_type())
+                    << "):";// << endl;
     string padding = "";
 
     t_type *type = get_true_type((*f_iter)->get_type());
@@ -1036,7 +1034,8 @@ void t_swift_generator::generate_swift_union_reader(ostream &out, t_struct *tstr
 void t_swift_generator::generate_swift_struct_reader(ostream &out,
                                                      t_struct *tstruct,
                                                      bool is_private) {
-  indent(out) << function_access_modifier(is_private) << " static func read(from sourceProtocol: TProtocol) throws -> "
+    indent(out) << function_access_modifier(is_private)
+                << " static func read(from sourceProtocol: TProtocol) throws -> "
               << prepend_struct_namespacing(tstruct->get_name());
 
   block_open(out);
@@ -1066,7 +1065,8 @@ void t_swift_generator::generate_swift_struct_reader(ostream &out,
 
   // Generate deserialization code for known cases
   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
-    indent(out) << "case (" << (*f_iter)->get_key() << ", " << type_to_enum((*f_iter)->get_type()) << "):";// << endl;
+        indent(out) << "case (" << (*f_iter)->get_key() << ", " << type_to_enum((*f_iter)->get_type())
+                    << "):";// << endl;
     string padding = "";
 
     t_type *type = get_true_type((*f_iter)->get_type());
