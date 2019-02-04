@@ -307,9 +307,10 @@ public class TThreadPoolServer extends TServer {
               eventHandler.processContext(connectionContext, inputTransport, outputTransport);
             }
 
-            if(stopped_ || !processor.process(inputProtocol, outputProtocol)) {
+            if (stopped_) {
               break;
             }
+            processor.process(inputProtocol, outputProtocol);
         }
       } catch (TException tx) {
         LOGGER.error("Thrift error occurred during processing of message.", tx);
@@ -320,11 +321,9 @@ public class TThreadPoolServer extends TServer {
         // Ignore err-logging all transport-level/type exceptions
         if ((realCause != null && realCause instanceof TTransportException)
             || (x instanceof TTransportException)) {
-          if (LOGGER.isDebugEnabled()) {
-            // Write to debug, just in case the exception gets required
-            LOGGER
-                .debug("Received TTransportException during processing of message, ignoring: ", x);
-          }
+          LOGGER.debug(
+              "Received TTransportException during processing of message. Ignoring.",
+              x);
         } else {
           // Log the exception at error level and continue
           LOGGER.error("Error occurred during processing of message.", x);

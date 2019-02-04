@@ -20,8 +20,16 @@
 # Uncomment this to show some basic cmake variables about platforms
 # include (NewPlatformDebug)
 
+# For Debug build types, append a "d" to the library names.
+set(CMAKE_DEBUG_POSTFIX "d" CACHE STRING "Set debug library postfix" FORCE)
+
 # Visual Studio specific options
 if(MSVC)
+    # Allow for shared library builds
+    if(BUILD_SHARED_LIBS)
+        set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON CACHE TYPE BOOL FORCE)
+    endif()
+
     #For visual studio the library naming is as following:
     # Dynamic libraries:
     #  - thrift.dll  for release library
@@ -35,11 +43,6 @@ if(MSVC)
     #  - thriftmtd.lib for /MT debug build
     #
     # the same holds for other libraries like libthriftz etc.
-
-    # For Debug build types, append a "d" to the library names.
-    set(CMAKE_DEBUG_POSTFIX "d" CACHE STRING "Set debug library postfix" FORCE)
-    set(CMAKE_RELEASE_POSTFIX "" CACHE STRING "Set release library postfix" FORCE)
-    set(CMAKE_RELWITHDEBINFO_POSTFIX "" CACHE STRING "Set release library postfix" FORCE)
 
     # Build using /MT option instead of /MD if the WITH_MT options is set
     if(WITH_MT)
@@ -56,30 +59,18 @@ if(MSVC)
         foreach(CompilerFlag ${CompilerFlags})
           string(REPLACE "/MD" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
         endforeach()
-        set(STATIC_POSTFIX "mt" CACHE STRING "Set static library postfix" FORCE)
+        set(THRIFT_RUNTIME_POSTFIX "mt" CACHE STRING "Set runtime library postfix" FORCE)
     else(WITH_MT)
-        set(STATIC_POSTFIX "md" CACHE STRING "Set static library postfix" FORCE)
+        set(THRIFT_RUNTIME_POSTFIX "md" CACHE STRING "Set runtime library postfix" FORCE)
     endif(WITH_MT)
 
     # Disable boost auto linking pragmas - cmake includes the right files
     add_definitions("-DBOOST_ALL_NO_LIB")
 
-    # Windows build does not know how to make a shared library yet
-    # as there are no __declspec(dllexport) or exports files in the project.
-    if (WITH_SHARED_LIB)
-      message (FATAL_ERROR "Windows build does not support shared library output yet, please set -DWITH_SHARED_LIB=off")
-    endif()
-
     add_definitions("/MP") # parallel build
     add_definitions("/W3") # warning level 3
 
-    # VS2010 does not provide inttypes which we need for "PRId64" used in many places
-    find_package(Inttypes)
-    if (Inttypes_FOUND)
-      include_directories(${INTTYPES_INCLUDE_DIRS})
-      # OpenSSL conflicts with the definition of PRId64 unless it is defined first
-      add_definitions("/FIinttypes.h")
-    endif ()
+    add_definitions("-DUNICODE -D_UNICODE")
 elseif(UNIX)
   find_program( MEMORYCHECK_COMMAND valgrind )
   set( MEMORYCHECK_COMMAND_OPTIONS "--gen-suppressions=all --leak-check=full" )
@@ -88,13 +79,6 @@ endif()
 
 add_definitions("-D__STDC_FORMAT_MACROS")
 add_definitions("-D__STDC_LIMIT_MACROS")
-
-# WITH_*THREADS selects which threading library to use
-if(WITH_BOOSTTHREADS)
-  add_definitions("-DUSE_BOOST_THREAD=1")
-elseif(WITH_STDTHREADS)
-  add_definitions("-DUSE_STD_THREAD=1")
-endif()
 
 # C++ Language Level
 set(CXX_LANGUAGE_LEVEL "C++${CMAKE_CXX_STANDARD}")
@@ -105,25 +89,8 @@ else()
 endif()
 if (CMAKE_CXX_EXTENSIONS)
   string(CONCAT CXX_LANGUAGE_LEVEL "${CXX_LANGUAGE_LEVEL} [with compiler-specific extensions]")
-else()
-  if ((CMAKE_CXX_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang") AND NOT MINGW)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-variadic-macros -Wno-long-long")
-  endif()
-  if ((CMAKE_CXX_COMPILER_ID MATCHES "Clang") AND NOT MINGW)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-c++11-long-long")
-  endif()
 endif()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-register")
 endif()
-
-# Building WITH_PLUGIN requires boost memory operations, for now, and gcc >= 4.8
-if (WITH_PLUGIN)
-  if (CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.8")
-    message(SEND_ERROR "Thrift compiler plug-in support is not possible with older gcc ( < 4.8 ) compiler")
-  endif()
-  message(STATUS "Forcing use of boost::smart_ptr to build WITH_PLUGIN")
-  add_definitions("-DFORCE_BOOST_SMART_PTR=1")
-endif()
-

@@ -20,11 +20,12 @@
 SUBDIRS = json xml
 PRECROSS_TARGET =
 
-if WITH_CPP
-# cpp dir is picked directly by plugin build
-if !WITH_PLUGIN
-SUBDIRS += cpp
+if WITH_AS3
+SUBDIRS += as3
 endif
+
+if WITH_CPP
+SUBDIRS += cpp
 endif
 
 if WITH_C_GLIB
@@ -71,8 +72,9 @@ if WITH_DART
 SUBDIRS += dart
 endif
 
-if WITH_DOTNETCORE
+if WITH_DOTNET
 SUBDIRS += netcore
+SUBDIRS += netstd
 endif
 
 if WITH_GO
@@ -110,7 +112,6 @@ endif
 # so they will end up in our release tarballs.
 EXTRA_DIST = \
 	as3 \
-	cocoa \
 	d \
 	dart \
 	delphi \

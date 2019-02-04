@@ -385,7 +385,7 @@
       ]
     },
     "client": {
-      "timeout": 5,
+      "timeout": 10,
       "command": [
         "ruby",
         "../integration/TestClient.rb",
@@ -562,6 +562,7 @@
   {
     "name": "dart",
     "client": {
+      "timeout": 30,
       "transports": [
         "buffered",
         "framed",
@@ -577,7 +578,9 @@
       ],
       "command": [
         "dart",
-        "test_client/bin/main.dart"
+	"--checked",
+        "test_client/bin/main.dart",
+	"--verbose"
       ]
     },
     "workdir": "dart"

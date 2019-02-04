@@ -415,7 +415,6 @@ const std::string emit_double_as_string(const double value) {
 }
 
 void t_erl_generator::generate_type_metadata(std::string function_name, vector<string> names) {
-  vector<string>::iterator s_iter;
   size_t num_structs = names.size();
 
   indent(f_types_file_) << function_name << "() ->\n";
@@ -947,7 +946,6 @@ void t_erl_generator::generate_service(t_service* tservice) {
 void t_erl_generator::generate_service_metadata(t_service* tservice) {
   export_string("function_names", 0);
   vector<t_function*> functions = tservice->get_functions();
-  vector<t_function*>::iterator f_iter;
   size_t num_functions = functions.size();
 
   indent(f_service_) << "function_names() -> " << endl;
@@ -1278,6 +1276,6 @@ std::string t_erl_generator::type_module(t_type* ttype) {
 THRIFT_REGISTER_GENERATOR(
     erl,
     "Erlang",
-    "    legacynames: Output files retain naming conventions of Thrift 0.9.1 and earlier.\n"
-    "    maps:        Generate maps instead of dicts.\n"
-    "    otp16:       Generate non-namespaced dict and set instead of dict:dict and sets:set.\n")
+    "    legacynames:     Output files retain naming conventions of Thrift 0.9.1 and earlier.\n"
+    "    maps:            Generate maps instead of dicts.\n"
+    "    otp16:           Generate non-namespaced dict and set instead of dict:dict and sets:set.\n")

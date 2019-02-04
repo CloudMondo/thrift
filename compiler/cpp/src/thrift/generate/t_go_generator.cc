@@ -1338,7 +1338,13 @@ void t_go_generator::generate_go_struct_definition(ostream& out,
       t_type* fieldType = (*m_iter)->get_type();
       string goType = type_to_go_type_with_opt(fieldType, is_pointer_field(*m_iter));
       string gotag = "db:\"" + escape_string((*m_iter)->get_name())  + "\" ";
-      if ((*m_iter)->get_req() == t_field::T_OPTIONAL) {
+
+      // Only add the `omitempty` tag if this field is optional and has no default value.
+      // Otherwise a proper value like `false` for a bool field will be ommitted from
+      // the JSON output since Go Marshal won't output `zero values`.
+      bool has_default = (*m_iter)->get_value();
+      bool is_optional = (*m_iter)->get_req() == t_field::T_OPTIONAL;
+      if (is_optional && !has_default) {
         gotag += "json:\"" + escape_string((*m_iter)->get_name()) + ",omitempty\"";
       } else {
         gotag += "json:\"" + escape_string((*m_iter)->get_name()) + "\"";
@@ -2153,7 +2159,6 @@ void t_go_generator::generate_service_remote(t_service* tservice) {
              << (*f_iter)->get_name() << "(";
     t_struct* arg_struct = (*f_iter)->get_arglist();
     const std::vector<t_field*>& args = arg_struct->get_members();
-    vector<t_field*>::const_iterator a_iter;
     std::vector<t_field*>::size_type num_args = args.size();
     bool first = true;
 
@@ -2308,7 +2313,6 @@ void t_go_generator::generate_service_remote(t_service* tservice) {
   for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
     t_struct* arg_struct = (*f_iter)->get_arglist();
     const std::vector<t_field*>& args = arg_struct->get_members();
-    vector<t_field*>::const_iterator a_iter;
     std::vector<t_field*>::size_type num_args = args.size();
     string funcName((*f_iter)->get_name());
     string pubName(publicize(funcName));
@@ -2693,7 +2697,6 @@ void t_go_generator::generate_process_function(t_service* tservice, t_function* 
 
   // t_struct* xs = tfunction->get_xceptions();
   // const std::vector<t_field*>& xceptions = xs->get_members();
-  vector<t_field*>::const_iterator x_iter;
   f_types_ << indent() << "type " << processorName << " struct {" << endl;
   f_types_ << indent() << "  handler " << publicize(tservice->get_name()) << endl;
   f_types_ << indent() << "}" << endl << endl;

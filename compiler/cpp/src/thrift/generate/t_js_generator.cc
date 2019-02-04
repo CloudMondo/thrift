@@ -41,6 +41,10 @@ using std::stringstream;
 using std::vector;
 
 static const string endl = "\n"; // avoid ostream << std::endl flushes
+// largest consecutive integer representable by a double (2 ^ 53 - 1)
+static const int64_t max_safe_integer = 0x1fffffffffffff;
+// smallest consecutive number representable by a double (-2 ^ 53 + 1)
+static const int64_t min_safe_integer = -max_safe_integer;
 
 #include "thrift/generate/t_oop_generator.h"
 
@@ -200,7 +204,9 @@ public:
 
   std::string js_includes();
   std::string ts_includes();
+  std::string ts_service_includes();
   std::string render_includes();
+  std::string render_ts_includes();
   std::string declare_field(t_field* tfield, bool init = false, bool obj = false);
   std::string function_signature(t_function* tfunction,
                                  std::string prefix = "",
@@ -282,7 +288,7 @@ public:
    * TypeScript Definition File helper functions
    */
 
-  string ts_function_signature(t_function* tfunction, bool include_callback, bool optional_callback);
+  string ts_function_signature(t_function* tfunction, bool include_callback);
   string ts_get_type(t_type* type);
 
   /**
@@ -296,7 +302,7 @@ public:
    * Returns "declare " if no module was defined.
    * @return string
    */
-  string ts_declare() { return (ts_module_.empty() ? "declare " : ""); }
+  string ts_declare() { return (ts_module_.empty() ? (gen_node_ ? "declare " : "export declare ") : ""); }
 
   /**
    * Returns "?" if the given field is optional or has a default value.
@@ -430,6 +436,8 @@ void t_js_generator::init_generator() {
       f_types_ << "if (typeof " << pns << " === 'undefined') {" << endl;
       f_types_ << "  " << pns << " = {};" << endl;
       f_types_ << "}" << endl;
+      f_types_ << "" << "if (typeof module !== 'undefined' && module.exports) {" << endl;
+      f_types_ << "  module.exports." << pns << " = " << pns << ";" << endl << "}" << endl;
     }
     if (gen_ts_) {
       ts_module_ = pns;
@@ -448,10 +456,11 @@ string t_js_generator::js_includes() {
     if (!gen_es6_) {
       result += js_const_type_ + "Q = thrift.Q;\n";
     }
+    result += js_const_type_ + "Int64 = require('node-int64');\n";
     return result;
   }
-
-  return "";
+  string result = "if (typeof Int64 === 'undefined' && typeof require === 'function') {\n  " + js_const_type_ + "Int64 = require('node-int64');\n}\n";
+  return result;
 }
 
 /**
@@ -462,10 +471,24 @@ string t_js_generator::ts_includes() {
     return string(
         "import thrift = require('thrift');\n"
         "import Thrift = thrift.Thrift;\n"
-        "import Q = thrift.Q;\n");
+        "import Q = thrift.Q;\n"
+        "import Int64 = require('node-int64');");
   }
+  return string("import Int64 = require('node-int64');");
+}
 
-  return "";
+/**
+ * Prints service ts imports
+ */
+string t_js_generator::ts_service_includes() {
+  if (gen_node_) {
+    return string(
+        "import thrift = require('thrift');\n"
+        "import Thrift = thrift.Thrift;\n"
+        "import Q = thrift.Q;\n"
+        "import Int64 = require('node-int64');");
+  }
+  return string("import Int64 = require('node-int64');");
 }
 
 /**
@@ -483,6 +506,27 @@ string t_js_generator::render_includes() {
     if (includes.size() > 0) {
       result += "\n";
     }
+  }
+
+  return result;
+}
+
+/**
+ * Renders all the imports necessary for including another Thrift program
+ */
+string t_js_generator::render_ts_includes() {
+  string result;
+
+  if (!gen_node_) {
+    return result;
+  }
+  const vector<t_program*>& includes = program_->get_includes();
+  for (size_t i = 0; i < includes.size(); ++i) {
+    result += "import " + make_valid_nodeJs_identifier(includes[i]->get_name()) + "_ttypes = require('./" + includes[i]->get_name()
+              + "_types');\n";
+  }
+  if (includes.size() > 0) {
+    result += "\n";
   }
 
   return result;
@@ -593,8 +637,17 @@ string t_js_generator::render_const_value(t_type* type, t_const_value* value) {
     case t_base_type::TYPE_I8:
     case t_base_type::TYPE_I16:
     case t_base_type::TYPE_I32:
-    case t_base_type::TYPE_I64:
       out << value->get_integer();
+      break;
+    case t_base_type::TYPE_I64:
+      {
+        int64_t const& integer_value = value->get_integer();
+        if (integer_value <= max_safe_integer && integer_value >= min_safe_integer) {
+          out << "new Int64(" << integer_value << ")";
+        } else {
+          out << "new Int64('" << std::hex << integer_value << std::dec << "')";
+        }
+      }
       break;
     case t_base_type::TYPE_DOUBLE:
       if (value->get_type() == t_const_value::CV_INTEGER) {
@@ -645,8 +698,12 @@ string t_js_generator::render_const_value(t_type* type, t_const_value* value) {
     for (v_iter = val.begin(); v_iter != val.end(); ++v_iter) {
       if (v_iter != val.begin())
         out << "," << endl;
-
-      out << indent() << render_const_value(ktype, v_iter->first);
+      
+      if (ktype->is_base_type() && ((t_base_type*)get_true_type(ktype))->get_base() == t_base_type::TYPE_I64){
+        out << indent() << "\"" << v_iter->first->get_integer() << "\"";
+      } else {
+        out << indent() << render_const_value(ktype, v_iter->first);
+      }
 
       out << " : ";
       out << render_const_value(vtype, v_iter->second);
@@ -1086,9 +1143,8 @@ void t_js_generator::generate_service(t_service* tservice) {
       f_service_ts_ << "/// <reference path=\"" << tservice->get_extends()->get_name()
                     << ".d.ts\" />" << endl;
     }
-    f_service_ts_ << autogen_comment() << endl;
+    f_service_ts_ << autogen_comment() << endl << ts_includes() << endl << render_ts_includes() << endl;
     if (gen_node_) {
-      f_service_ts_ << ts_includes() << endl;
       f_service_ts_ << "import ttypes = require('./" + program_->get_name() + "_types');" << endl;
       // Generate type aliases
       // enum
@@ -1119,9 +1175,18 @@ void t_js_generator::generate_service(t_service* tservice) {
         f_service_ts_ << "import " << (*s_iter)->get_name() << " = ttypes."
                   << js_namespace(program_) << (*s_iter)->get_name() << endl;
       }
+    } else {
+      f_service_ts_ << "import { " << program_->get_name() << " } from \"./" << program_->get_name() << "_types\";" << endl << endl;
     }
     if (!ts_module_.empty()) {
-      f_service_ts_ << "declare module " << ts_module_ << " {";
+      if (gen_node_) {
+        f_service_ts_ << "declare module " << ts_module_ << " {";
+      } else {
+        f_service_ts_ << "declare module \"./" << program_->get_name() << "_types\" {" << endl;
+        indent_up();
+        f_service_ts_ << ts_indent() << "module " << program_->get_name() << " {" << endl;
+        indent_up();
+      }
     }
   }
 
@@ -1149,7 +1214,13 @@ void t_js_generator::generate_service(t_service* tservice) {
   f_service_.close();
   if (gen_ts_) {
     if (!ts_module_.empty()) {
-      f_service_ts_ << "}";
+      if (gen_node_) {
+        f_service_ts_ << "}" << endl;
+      } else {
+        indent_down();
+        f_service_ts_ << ts_indent() << "}" << endl;
+        f_service_ts_ << "}" << endl;
+      }
     }
     f_service_ts_.close();
   }
@@ -1174,9 +1245,9 @@ void t_js_generator::generate_service_processor(t_service* tservice) {
       }
       f_service_ts_ << "{" << endl;
       indent_up();
-      f_service_ts_ << ts_indent() << "private _handler: Object;" << endl << endl;
-      f_service_ts_ << ts_indent() << "constructor(handler: Object);" << endl;
-      f_service_ts_ << ts_indent() << "process(input: Thrift.TJSONProtocol, output: Thrift.TJSONProtocol): void;" << endl;
+      f_service_ts_ << ts_indent() << "private _handler: object;" << endl << endl;
+      f_service_ts_ << ts_indent() << "constructor(handler: object);" << endl;
+      f_service_ts_ << ts_indent() << "process(input: thrift.TProtocol, output: thrift.TProtocol): void;" << endl;
       indent_down();
     }
   } else {
@@ -1280,7 +1351,7 @@ void t_js_generator::generate_process_function(t_service* tservice, t_function* 
   }
   if (gen_ts_) {
     indent_up();
-    f_service_ts_ << ts_indent() << "process_" << tfunction->get_name() << "(seqid: number, input: Thrift.TJSONProtocol, output: Thrift.TJSONProtocol): void;" << endl;
+    f_service_ts_ << ts_indent() << "process_" << tfunction->get_name() << "(seqid: number, input: thrift.TProtocol, output: thrift.TProtocol): void;" << endl;
     indent_down();
   }
 
@@ -1600,10 +1671,11 @@ void t_js_generator::generate_service_client(t_service* tservice) {
     indent(f_service_) << "this._seqid = 0;" << endl;
     indent(f_service_) << "this._reqs = {};" << endl;
     if (gen_ts_) {
-      f_service_ts_ << ts_indent() << "private input: Thrift.TJSONProtocol;" << endl << ts_indent()
-                    << "private output: Thrift.TJSONProtocol;" << endl << ts_indent() << "private seqid: number;"
-                    << endl << endl << ts_indent()
-                    << "constructor(input: Thrift.TJSONProtocol, output?: Thrift.TJSONProtocol);"
+      f_service_ts_ << ts_indent() << "private output: thrift.TTransport;" << endl
+                    << ts_indent() << "private pClass: thrift.TProtocol;" << endl
+                    << ts_indent() << "private _seqid: number;" << endl
+                    << endl
+                    << ts_indent() << "constructor(output: thrift.TTransport, pClass: { new(trans: thrift.TTransport): thrift.TProtocol });"
                     << endl;
     }
   } else {
@@ -1674,13 +1746,13 @@ void t_js_generator::generate_service_client(t_service* tservice) {
 
     if (gen_ts_) {
       // function definition without callback
-      f_service_ts_ << ts_print_doc(*f_iter) << ts_indent() << ts_function_signature(*f_iter, false, false) << endl;
+      f_service_ts_ << ts_print_doc(*f_iter) << ts_indent() << ts_function_signature(*f_iter, false) << endl;
       if (!gen_es6_) {
         // overload with callback
-        f_service_ts_ << ts_print_doc(*f_iter) << ts_indent() << ts_function_signature(*f_iter, true, false) << endl;
+        f_service_ts_ << ts_print_doc(*f_iter) << ts_indent() << ts_function_signature(*f_iter, true) << endl;
       } else {
         // overload with callback
-        f_service_ts_ << ts_print_doc(*f_iter) << ts_indent() << ts_function_signature(*f_iter, true, true) << endl;
+        f_service_ts_ << ts_print_doc(*f_iter) << ts_indent() << ts_function_signature(*f_iter, true) << endl;
       }
     }
 
@@ -2572,9 +2644,11 @@ string t_js_generator::ts_get_type(t_type* type) {
       break;
     case t_base_type::TYPE_I16:
     case t_base_type::TYPE_I32:
-    case t_base_type::TYPE_I64:
     case t_base_type::TYPE_DOUBLE:
       ts_type = "number";
+      break;
+    case t_base_type::TYPE_I64:
+      ts_type = "Int64";
       break;
     case t_base_type::TYPE_VOID:
       ts_type = "void";
@@ -2622,7 +2696,7 @@ string t_js_generator::ts_get_type(t_type* type) {
  * @param bool in-/exclude the callback argument
  * @return String of rendered function definition
  */
-std::string t_js_generator::ts_function_signature(t_function* tfunction, bool include_callback, bool optional_callback) {
+std::string t_js_generator::ts_function_signature(t_function* tfunction, bool include_callback) {
   string str;
   const vector<t_field*>& fields = tfunction->get_arglist()->get_members();
   vector<t_field*>::const_iterator f_iter;
@@ -2638,7 +2712,6 @@ std::string t_js_generator::ts_function_signature(t_function* tfunction, bool in
   }
 
   if (include_callback) {
-    string callback_optional_string = optional_callback ? "?" : "";
     if (gen_node_) {
       t_struct* exceptions = tfunction->get_xceptions();
       string exception_types;
@@ -2647,19 +2720,19 @@ std::string t_js_generator::ts_function_signature(t_function* tfunction, bool in
         for (vector<t_field*>::const_iterator it = members.begin(); it != members.end(); ++it) {
           t_type* t = get_true_type((*it)->get_type());
           if (it == members.begin()) {
-            exception_types = t->get_name();
+            exception_types = js_type_namespace(t->get_program()) + t->get_name();
           } else {
-            exception_types += " | " + t->get_name();
+            exception_types += " | " + js_type_namespace(t->get_program()) + t->get_name();
           }
         }
       }
       if (exception_types == "") {
-        str += "callback" + callback_optional_string + ": (error: void, response: " + ts_get_type(tfunction->get_returntype()) + ")=>void): ";
+        str += "callback?: (error: void, response: " + ts_get_type(tfunction->get_returntype()) + ")=>void): ";
       } else {
-        str += "callback" + callback_optional_string + ": (error: " + exception_types + ", response: " + ts_get_type(tfunction->get_returntype()) + ")=>void): ";
+        str += "callback?: (error: " + exception_types + ", response: " + ts_get_type(tfunction->get_returntype()) + ")=>void): ";
       }
     } else {
-      str += "callback" + callback_optional_string + ": (data: " + ts_get_type(tfunction->get_returntype()) + ")=>void): ";
+      str += "callback?: (data: " + ts_get_type(tfunction->get_returntype()) + ")=>void): ";
     }
 
     if (gen_jquery_) {

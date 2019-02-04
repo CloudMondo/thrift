@@ -135,12 +135,6 @@ UnitTests_SOURCES = \
 	TServerTransportTest.cpp \
 	TTransportCheckThrow.h
 
-if !WITH_BOOSTTHREADS
-UnitTests_SOURCES += \
-  concurrency/MutexTest.cpp \
-  concurrency/RWMutexStarveTest.cpp
-endif
-
 UnitTests_LDADD = \
   libtestgencpp.la \
   $(BOOST_TEST_LDADD) \

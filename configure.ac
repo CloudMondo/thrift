@@ -20,7 +20,7 @@
 AC_PREREQ(2.65)
 AC_CONFIG_MACRO_DIR([./aclocal])
 
-AC_INIT([thrift], [1.0.0])
+AC_INIT([thrift], [0.13.0])
 
 AC_CONFIG_AUX_DIR([.])
 
@@ -102,10 +102,7 @@ AC_PROG_AWK
 AC_PROG_RANLIB
 
 AC_LANG([C++])
-AX_CXX_COMPILE_STDCXX_11([noext], [optional])
-if test "$ac_success" = "no"; then
-  CXXFLAGS="$CXXFLAGS -Wno-variadic-macros -Wno-long-long -Wno-c++11-long-long"
-fi
+AX_CXX_COMPILE_STDCXX_11([noext], [mandatory])
 
 AM_EXTRA_RECURSIVE_TARGETS([style])
 AC_SUBST(CPPSTYLE_CMD, 'find . -type f \( -iname "*.h" -or -iname "*.cpp" -or -iname "*.cc" -or -iname "*.tcc" \) -printf "Reformatting: %h/%f\n" -exec clang-format -i {} \;')
@@ -119,6 +116,7 @@ AC_ARG_ENABLE([libs],
 have_libs=yes
 if test "$enable_libs" = "no"; then
   have_libs="no"
+  with_as3="no"
   with_cpp="no"
   with_c_glib="no"
   with_cl="no"
@@ -130,6 +128,7 @@ if test "$enable_libs" = "no"; then
   with_haskell="no"
   with_haxe="no"
   with_dotnetcore="no"
+  with_netstd="no"
   with_perl="no"
   with_php="no"
   with_php_extension="no"
@@ -143,6 +142,18 @@ if test "$enable_libs" = "no"; then
   with_rs="no"
   with_swift="no"
 fi
+
+AX_THRIFT_LIB(as3, [as3], yes)
+have_as3=no
+if test "$with_as3" = "yes"; then
+  if test "${FLEX_HOME+set}" = set; then 
+    AC_PATH_PROGS([FLEX_COMPC], [compc], "fail", [$PATH$PATH_SEPARATOR$FLEX_HOME/bin])
+    if test "$FLEX_COMPC" != "fail"; then
+      have_as3="yes"
+    fi
+  fi
+fi
+AM_CONDITIONAL(WITH_AS3, [test "$have_as3" = "yes"])
 
 AX_THRIFT_LIB(cpp, [C++], yes)
 have_cpp=no
@@ -158,23 +169,11 @@ if test "$with_cpp" = "yes";  then
     have_cpp="yes"
   fi
 
-  AX_LIB_EVENT([1.0])
+  AX_LIB_EVENT([2.0])
   have_libevent=$success
 
   AX_LIB_ZLIB([1.2.3])
   have_zlib=$success
-
-  AX_THRIFT_LIB(qt4, [Qt], yes)
-  have_qt=no
-  if test "$with_qt4" = "yes";  then
-    PKG_CHECK_MODULES([QT], [QtCore >= 4.3, QtNetwork >= 4.3], have_qt=yes, have_qt=no)
-  fi
-  if test "$have_qt" = "yes"; then
-    AC_PATH_PROGS([QT_MOC], [moc-qt4 moc], "fail")
-    if test "$QT_MOC" = "fail"; then
-      have_qt=no
-    fi
-  fi
 
   AX_THRIFT_LIB(qt5, [Qt5], yes)
   have_qt5=no
@@ -194,7 +193,6 @@ fi
 AM_CONDITIONAL([WITH_CPP], [test "$have_cpp" = "yes"])
 AM_CONDITIONAL([AMX_HAVE_LIBEVENT], [test "$have_libevent" = "yes"])
 AM_CONDITIONAL([AMX_HAVE_ZLIB], [test "$have_zlib" = "yes"])
-AM_CONDITIONAL([AMX_HAVE_QT], [test "$have_qt" = "yes"])
 AM_CONDITIONAL([AMX_HAVE_QT5], [test "$have_qt5" = "yes"])
 AM_CONDITIONAL([QT5_REDUCE_RELOCATIONS], [test "x$qt_reduce_reloc" != "x"])
 
@@ -203,14 +201,15 @@ if test "$with_c_glib" = "yes"; then
   PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.0], have_glib2=yes, have_glib2=no)
   PKG_CHECK_MODULES([GOBJECT], [gobject-2.0 >= 2.0], have_gobject2=yes, have_gobject2=no)
   if test "$have_glib2" = "yes" -a "$have_gobject2" = "yes" ; then
+    AC_PATH_PROG([GSETTINGS], [gsettings])
     have_c_glib="yes"
   fi
 fi
 AM_CONDITIONAL(WITH_C_GLIB, [test "$have_glib2" = "yes" -a "$have_gobject2" = "yes"])
 
-echo "OpenSSL check"
+# echo "OpenSSL check"
 if test "$have_cpp" = "yes" -o "$have_c_glib" = "yes";  then
-  echo "Have cpp or c so we check for OpenSSL"
+  # echo "Have cpp or c so we check for OpenSSL"
   AX_CHECK_OPENSSL()
 fi
 
@@ -510,7 +509,7 @@ if test "$with_dotnetcore" = "yes";  then
     AX_PROG_DOTNETCORE_VERSION( [2.0.0], have_dotnetcore="yes", have_dotnetcore="no")
   fi
 fi
-AM_CONDITIONAL(WITH_DOTNETCORE, [test "$have_dotnetcore" = "yes"])
+AM_CONDITIONAL(WITH_DOTNET, [test "$have_dotnetcore" = "yes"])
 
 
 AX_THRIFT_LIB(d, [D], yes)
@@ -608,20 +607,6 @@ if test "$enable_tests" = "no"; then
   have_tests="no"
 fi
 AM_CONDITIONAL(WITH_TESTS, [test "$have_tests" = "yes"])
-
-AC_ARG_ENABLE([plugin],
-  AS_HELP_STRING([--enable-plugin], [build compiler plugin support [default=no]]),
-  [], enable_plugin=no
-)
-have_plugin=yes
-if test "$have_cpp" = "no" ; then
-  have_plugin="no"
-fi
-if test "$enable_plugin" = "no"; then
-  have_plugin="no"
-fi
-AC_CONFIG_LINKS([compiler/cpp/test/plugin/t_cpp_generator.cc:compiler/cpp/src/thrift/generate/t_cpp_generator.cc])
-AM_CONDITIONAL(WITH_PLUGIN, [test "$have_plugin" = "yes"])
 
 AC_ARG_ENABLE([tutorial],
   AS_HELP_STRING([--enable-tutorial], [build tutorial [default=yes]]),
@@ -788,24 +773,6 @@ AC_SUBST(GCOV_CFLAGS)
 AC_SUBST(GCOV_CXXFLAGS)
 AC_SUBST(GCOV_LDFLAGS)
 
-AC_ARG_ENABLE(boostthreads,
-              [  --enable-boostthreads      use boost threads, instead of POSIX pthread (experimental) ],
-              [case "${enableval}" in
-                yes) ENABLE_BOOSTTHREADS=1 ;;
-                no) ENABLE_BOOSTTHREADS=0 ;;
-                *) AC_MSG_ERROR(bad value ${enableval} for --enable-cov) ;;
-              esac],
-              [ENABLE_BOOSTTHREADS=2])
-
-
-if test "x[$]ENABLE_BOOSTTHREADS" = "x1"; then
-  AC_MSG_WARN(enable boostthreads)
-  AC_DEFINE([USE_BOOST_THREAD], [1], [experimental --enable-boostthreads that replaces POSIX pthread by boost::thread])
-  LIBS="-lboost_thread $LIBS"
-fi
-
-AM_CONDITIONAL([WITH_BOOSTTHREADS], [test "x[$]ENABLE_BOOSTTHREADS" = "x1"])
-
 AC_CONFIG_HEADERS(config.h:config.hin)
 AC_CONFIG_HEADERS(lib/cpp/src/thrift/config.h:config.hin)
 AC_CONFIG_HEADERS(lib/c_glib/src/thrift/config.h:config.hin)
@@ -823,16 +790,15 @@ AC_CONFIG_FILES([
   Makefile
   compiler/cpp/Makefile
   compiler/cpp/src/Makefile
-  compiler/cpp/src/thrift/plugin/Makefile
   compiler/cpp/test/Makefile
   compiler/cpp/src/thrift/version.h
   lib/Makefile
+  lib/as3/Makefile
   lib/cl/Makefile
   lib/cpp/Makefile
   lib/cpp/test/Makefile
   lib/cpp/thrift-nb.pc
   lib/cpp/thrift-z.pc
-  lib/cpp/thrift-qt.pc
   lib/cpp/thrift-qt5.pc
   lib/cpp/thrift.pc
   lib/c_glib/Makefile
@@ -853,10 +819,11 @@ AC_CONFIG_FILES([
   lib/json/Makefile
   lib/json/test/Makefile
   lib/netcore/Makefile
+  lib/netstd/Makefile
   lib/nodejs/Makefile
   lib/nodets/Makefile
   lib/perl/Makefile
-  lib/perl/test/Makefile
+  lib/perl/t/Makefile
   lib/php/Makefile
   lib/php/test/Makefile
   lib/dart/Makefile
@@ -866,6 +833,7 @@ AC_CONFIG_FILES([
   lib/rs/test/Makefile
   lib/lua/Makefile
   lib/swift/Makefile
+  lib/ts/Makefile
   lib/xml/Makefile
   lib/xml/test/Makefile
   test/Makefile
@@ -880,6 +848,7 @@ AC_CONFIG_FILES([
   test/hs/Makefile
   test/lua/Makefile
   test/netcore/Makefile
+  test/netstd/Makefile
   test/php/Makefile
   test/dart/Makefile
   test/perl/Makefile
@@ -899,6 +868,7 @@ AC_CONFIG_FILES([
   tutorial/java/Makefile
   tutorial/js/Makefile
   tutorial/netcore/Makefile
+  tutorial/netstd/Makefile
   tutorial/nodejs/Makefile
   tutorial/dart/Makefile
   tutorial/py/Makefile
@@ -908,6 +878,8 @@ AC_CONFIG_FILES([
   tutorial/rs/Makefile
 ])
 
+if test "$have_as3" = "yes" ; then MAYBE_AS3="as3" ; else MAYBE_AS3="" ; fi
+AC_SUBST([MAYBE_AS3])
 if test "$have_cpp" = "yes" ; then MAYBE_CPP="cpp" ; else MAYBE_CPP="" ; fi
 AC_SUBST([MAYBE_CPP])
 if test "$have_c_glib" = "yes" ; then MAYBE_C_GLIB="c_glib" ; else MAYBE_C_GLIB="" ; fi
@@ -957,6 +929,7 @@ AC_OUTPUT
 echo
 echo "$PACKAGE $VERSION"
 echo
+echo "Building ActionScript3 Library : $have_as3"
 echo "Building C (GLib) Library .... : $have_c_glib"
 echo "Building C# (Mono) Library ... : $have_csharp"
 echo "Building C++ Library ......... : $have_cpp"
@@ -964,6 +937,7 @@ echo "Building Common Lisp Library.. : $have_cl"
 echo "Building D Library ........... : $have_d"
 echo "Building Dart Library ........ : $have_dart"
 echo "Building dotnetcore Library .. : $have_dotnetcore"
+echo "Building .NET Standard Library : $have_dotnetcore"
 echo "Building Erlang Library ...... : $have_erlang"
 echo "Building Go Library .......... : $have_go"
 echo "Building Haskell Library ..... : $have_haskell"
@@ -973,13 +947,23 @@ echo "Building Lua Library ......... : $have_lua"
 echo "Building NodeJS Library ...... : $have_nodejs"
 echo "Building Perl Library ........ : $have_perl"
 echo "Building PHP Library ......... : $have_php"
-echo "Building Plugin Support ...... : $have_plugin"
 echo "Building Python Library ...... : $have_python"
 echo "Building Py3 Library ......... : $have_py3"
 echo "Building Ruby Library ........ : $have_ruby"
 echo "Building Rust Library ........ : $have_rs"
 echo "Building Swift Library ....... : $have_swift"
 
+if test "$have_as3" = "yes" ; then
+  echo
+  echo "ActionScript Library:"
+  echo "   FLEX_HOME ................. : $FLEX_HOME"
+  echo "   Using compc version ....... : $($FLEX_COMPC --version)"
+fi
+if test "$have_c_glib" = "yes" ; then
+  echo
+  echo "C (glib):"
+  echo "   Using glib version ........ : $($GSETTINGS --version)"
+fi
 if test "$have_csharp" = "yes" ; then
   echo
   echo "C# Library:"
@@ -992,7 +976,6 @@ if test "$have_cpp" = "yes" ; then
   echo "   C++ compiler .............. : $CXX"
   echo "   Build TZlibTransport ...... : $have_zlib"
   echo "   Build TNonblockingServer .. : $have_libevent"
-  echo "   Build TQTcpServer (Qt4) ... : $have_qt"
   echo "   Build TQTcpServer (Qt5) ... : $have_qt5"
   echo "   C++ compiler version ...... : $($CXX --version | head -1)"
 fi
@@ -1022,6 +1005,12 @@ if test "$have_dotnetcore" = "yes" ; then
   echo ".NET Core Library:"
   echo "   Using .NET Core ........... : $DOTNETCORE"
   echo "   Using .NET Core version ... : $DOTNETCORE_VERSION"
+fi
+if test "$have_dotnetcore" = "yes" ; then
+  echo
+  echo ".NET Standard Library:"
+  echo "   Using dotnet .............. : $DOTNETCORE"
+  echo "   Using dotnet version ...... : $DOTNETCORE_VERSION"
 fi
 if test "$have_erlang" = "yes" ; then
   echo

@@ -29,6 +29,8 @@ namespace thrift {
 
 TOutput GlobalOutput;
 
+TOutput::TOutput() : f_(&errorTimeWrapper) {}
+
 void TOutput::printf(const char* message, ...) {
 #ifndef THRIFT_SQUELCH_CONSOLE_OUTPUT
   // Try to reduce heap usage, even if printf is called rarely.
@@ -60,7 +62,7 @@ void TOutput::printf(const char* message, ...) {
 #endif
 
   char* heap_buf = (char*)malloc((need + 1) * sizeof(char));
-  if (heap_buf == NULL) {
+  if (heap_buf == nullptr) {
 #ifdef _MSC_VER
     va_start(ap, message);
     vsnprintf_s(stack_buf, STACK_BUF_SIZE, _TRUNCATE, message, ap);
