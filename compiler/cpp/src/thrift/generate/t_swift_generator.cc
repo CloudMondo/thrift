@@ -80,6 +80,8 @@ public:
                 safe_enums_ = true;
             } else if (iter->first == "force_optionals") {
                 force_optionals_ = true;
+            } else if (iter->first == "codable") {
+                codable_ = true;
             } else {
                 throw "Unknown option:" + iter->first;
             }
@@ -319,6 +321,7 @@ private:
     bool module_namespacing_;
 
     bool safe_enums_;
+    bool codable_;
     bool force_optionals_;
 
     /** Structure namespacing */
@@ -2448,6 +2451,7 @@ THRIFT_REGISTER_GENERATOR(
         "                     Generate Swift code using namespacing."
         "                     module: Generate sources in module scoped output directories.\n"
         "                     struct: Use structs as wrappers.\n"
+        "    codable:         Add Codable conformance."
         "    force_optionals: Force generating all fields as Swift optionals."
         "    prefix_reserved_words:\n"
         "                     Prefix any reserved words instead of escaping them.\n"
