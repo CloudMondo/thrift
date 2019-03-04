@@ -56,6 +56,7 @@ public:
         debug_descriptions_ = false;
         module_namespacing_ = false;
         struct_namespacing_ = false;
+        codable_ = true;
         reserved_words_prefix_ = "";
         safe_enums_ = false;
 
@@ -80,8 +81,6 @@ public:
                 safe_enums_ = true;
             } else if (iter->first == "force_optionals") {
                 force_optionals_ = true;
-            } else if (iter->first == "codable") {
-                codable_ = true;
             } else {
                 throw "Unknown option:" + iter->first;
             }
@@ -691,6 +690,12 @@ void t_swift_generator::generate_swift_struct(ostream &out,
 
         if (tstruct->is_xception()) {
             out << ": Swift.Error"; // Error seems to be a common exception name in thrift
+
+            if (codable_) {
+                out << ", Codable";
+            }
+        } else if (codable_) {
+            out << ": Codable";
         }
 
         block_open(out);
@@ -2451,7 +2456,6 @@ THRIFT_REGISTER_GENERATOR(
         "                     Generate Swift code using namespacing."
         "                     module: Generate sources in module scoped output directories.\n"
         "                     struct: Use structs as wrappers.\n"
-        "    codable:         Add Codable conformance."
         "    force_optionals: Force generating all fields as Swift optionals."
         "    prefix_reserved_words:\n"
         "                     Prefix any reserved words instead of escaping them.\n"
