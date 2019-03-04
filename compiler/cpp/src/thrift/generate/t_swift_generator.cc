@@ -474,6 +474,9 @@ void t_swift_generator::generate_enum(t_enum *tenum) {
     vector<t_enum_value *> constants = tenum->get_constants();
     vector<t_enum_value *>::iterator c_iter;
 
+    f_decl_ << endl;
+    f_decl_ << indent() << "// MARK: - Cases" << endl;
+    f_decl_ << endl;
     for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
         f_decl_ << indent() << "case " << enum_case_name((*c_iter)) << endl;
     }
@@ -482,36 +485,20 @@ void t_swift_generator::generate_enum(t_enum *tenum) {
     if (safe_enums_) {
         f_decl_ << indent() << "case unknown(Int32)" << endl;
     }
+
     f_decl_ << endl;
-
-    // TSerializable read(from:)
-    f_decl_ << indent() << "public static func read(from sourceProtocol: TProtocol) throws -> "
-            << prepend_struct_namespacing(tenum->get_name());
-    block_open(f_decl_);
-    f_decl_ << indent() << "let raw: Int32 = try sourceProtocol.read()" << endl;
-    f_decl_ << indent() << "let new = " << tenum->get_name() << "(rawValue: raw)" << endl;
-
-    f_decl_ << indent() << "if let unwrapped = new {" << endl;
-    indent_up();
-    f_decl_ << indent() << "return unwrapped" << endl;
-    indent_down();
-    f_decl_ << indent() << "} else {" << endl;
-    indent_up();
-    f_decl_ << indent() << "throw TProtocolError(error: .invalidData," << endl;
-    f_decl_ << indent() << "                     message: \"Invalid enum value (\\(raw)) for \\("
-            << tenum->get_name() << ".self)\")" << endl;
-    indent_down();
-    f_decl_ << indent() << "}" << endl;
-    block_close(f_decl_);
+    f_decl_ << indent() << "// MARK: - Properties" << endl;
+    f_decl_ << endl;
 
     // Default enum case.
-    f_decl_ << endl;
     f_decl_ << indent() << "public static var defaultValue: " << tenum->get_name();
     block_open(f_decl_);
     f_decl_ << indent() << "return ." << enum_case_name(constants.front()) << endl;
     block_close(f_decl_);
-    f_decl_ << endl;
 
+    f_decl_ << endl;
+    f_decl_ << indent() << "// MARK: - Raw value" << endl;
+    f_decl_ << endl;
     // rawValue getter
     f_decl_ << indent() << "public var rawValue: Int32";
     block_open(f_decl_);
@@ -557,6 +544,31 @@ void t_swift_generator::generate_enum(t_enum *tenum) {
     }
     block_close(f_decl_);
     block_close(f_decl_);
+
+    // TSerializable read(from:)
+    f_decl_ << endl;
+    f_decl_ << indent() << "// MARK: - TSerializable" << endl;
+    f_decl_ << endl;
+    f_decl_ << indent() << "public static func read(from sourceProtocol: TProtocol) throws -> "
+            << prepend_struct_namespacing(tenum->get_name());
+    block_open(f_decl_);
+    f_decl_ << indent() << "let raw: Int32 = try sourceProtocol.read()" << endl;
+    f_decl_ << indent() << "let new = " << tenum->get_name() << "(rawValue: raw)" << endl;
+
+    f_decl_ << indent() << "if let unwrapped = new {" << endl;
+    indent_up();
+    f_decl_ << indent() << "return unwrapped" << endl;
+    indent_down();
+    f_decl_ << indent() << "} else {" << endl;
+    indent_up();
+    f_decl_ << indent() << "throw TProtocolError(error: .invalidData," << endl;
+    f_decl_ << indent() << "                     message: \"Invalid enum value (\\(raw)) for \\("
+            << tenum->get_name() << ".self)\")" << endl;
+    indent_down();
+    f_decl_ << indent() << "}" << endl;
+    block_close(f_decl_);
+
+    f_decl_ << endl;
     block_close(f_decl_);
     f_decl_ << endl;
 }
@@ -708,10 +720,11 @@ void t_swift_generator::generate_swift_struct(ostream &out,
         }
 
         block_open(out);
+        out << endl;
+        out << indent() << "// MARK: - Properties" << endl;
+        out << endl;
         for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
-            out << endl;
             // TODO: Defaults
-
             string doc = (*m_iter)->get_doc();
             generate_docstring(out, doc);
 
@@ -719,8 +732,8 @@ void t_swift_generator::generate_swift_struct(ostream &out,
         }
 
         out << endl;
+        out << indent() << "// MARK: - Initializers" << endl;
         out << endl;
-
         if (!struct_has_required_fields(tstruct)) {
             indent(out) << access_modifier << " init() { }" << endl;
         }
