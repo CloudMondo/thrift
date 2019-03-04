@@ -408,7 +408,6 @@ string t_swift_generator::swift_imports() {
             includes << ("import " + get_real_swift_module(program_includes[i])) << endl;
         }
     }
-    includes << endl;
 
     return includes.str();
 }
@@ -429,8 +428,6 @@ string t_swift_generator::swift_thrift_imports() {
     for (i_iter = includes_list.begin(); i_iter != includes_list.end(); ++i_iter) {
         includes << "import " << *i_iter << endl;
     }
-
-    includes << endl;
 
     return includes.str();
 }
@@ -507,47 +504,59 @@ void t_swift_generator::generate_enum(t_enum *tenum) {
     f_decl_ << indent() << "}" << endl;
     block_close(f_decl_);
 
-    // empty init for TSerializable
+    // Default enum case.
     f_decl_ << endl;
-    f_decl_ << indent() << "public init()";
+    f_decl_ << indent() << "public static var defaultValue: " << tenum->get_name();
     block_open(f_decl_);
-
-    f_decl_ << indent() << "self = ." << enum_case_name(constants.front()) << endl;
+    f_decl_ << indent() << "return ." << enum_case_name(constants.front()) << endl;
     block_close(f_decl_);
     f_decl_ << endl;
 
     // rawValue getter
     f_decl_ << indent() << "public var rawValue: Int32";
     block_open(f_decl_);
-    f_decl_ << indent() << "switch self {" << endl;
+    f_decl_ << indent() << "switch self";
+    block_open(f_decl_);
     for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
-        f_decl_ << indent() << "case ." << enum_case_name((*c_iter))
-                << ": return " << (*c_iter)->get_value() << endl;
+        f_decl_ << indent() << "case ." << enum_case_name((*c_iter)) << ":" << endl;
+        indent_up();
+        f_decl_ << indent() << "return " << (*c_iter)->get_value() << endl;
+        indent_down();
     }
     if (safe_enums_) {
-        f_decl_ << indent() << "case .unknown(let value): return value" << endl;
+        f_decl_ << indent() << "case .unknown(let value):" << endl;
+        indent_up();
+        f_decl_ << indent() << "return value" << endl;
+        indent_down();
     }
-    f_decl_ << indent() << "}" << endl;
+    block_close(f_decl_);
     block_close(f_decl_);
     f_decl_ << endl;
 
     // convenience rawValue initalizer
     f_decl_ << indent() << "public init?(rawValue: Int32)";
     block_open(f_decl_);
-    f_decl_ << indent() << "switch rawValue {" << endl;;
+    f_decl_ << indent() << "switch rawValue";
+    block_open(f_decl_);
     for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
-        f_decl_ << indent() << "case " << (*c_iter)->get_value()
-                << ": self = ." << enum_case_name((*c_iter)) << endl;
+        f_decl_ << indent() << "case " << (*c_iter)->get_value() << ":" << endl;
+        indent_up();
+        f_decl_ << indent() << "self = ." << enum_case_name((*c_iter)) << endl;
+        indent_down();
     }
     if (!safe_enums_) {
-        f_decl_ << indent() << "default: return nil" << endl;
+        f_decl_ << indent() << "default:" << endl;
+        indent_up();
+        f_decl_ << indent() << "return nil" << endl;
+        indent_down();
     } else {
-        f_decl_ << indent() << "default: self = .unknown(rawValue)" << endl;
+        f_decl_ << indent() << "default:" << endl;
+        indent_up();
+        f_decl_ << indent() << "self = .unknown(rawValue)" << endl;
+        indent_down();
     }
-    f_decl_ << indent() << "}" << endl;
     block_close(f_decl_);
-
-
+    block_close(f_decl_);
     block_close(f_decl_);
     f_decl_ << endl;
 }
