@@ -56,6 +56,7 @@ public:
         debug_descriptions_ = false;
         module_namespacing_ = false;
         struct_namespacing_ = false;
+        codable_ = true;
         reserved_words_prefix_ = "";
         safe_enums_ = false;
 
@@ -319,6 +320,7 @@ private:
     bool module_namespacing_;
 
     bool safe_enums_;
+    bool codable_;
     bool force_optionals_;
 
     /** Structure namespacing */
@@ -406,7 +408,6 @@ string t_swift_generator::swift_imports() {
             includes << ("import " + get_real_swift_module(program_includes[i])) << endl;
         }
     }
-    includes << endl;
 
     return includes.str();
 }
@@ -427,8 +428,6 @@ string t_swift_generator::swift_thrift_imports() {
     for (i_iter = includes_list.begin(); i_iter != includes_list.end(); ++i_iter) {
         includes << "import " << *i_iter << endl;
     }
-
-    includes << endl;
 
     return includes.str();
 }
@@ -475,6 +474,9 @@ void t_swift_generator::generate_enum(t_enum *tenum) {
     vector<t_enum_value *> constants = tenum->get_constants();
     vector<t_enum_value *>::iterator c_iter;
 
+    f_decl_ << endl;
+    f_decl_ << indent() << "// MARK: - Cases" << endl;
+    f_decl_ << endl;
     for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
         f_decl_ << indent() << "case " << enum_case_name((*c_iter)) << endl;
     }
@@ -483,9 +485,70 @@ void t_swift_generator::generate_enum(t_enum *tenum) {
     if (safe_enums_) {
         f_decl_ << indent() << "case unknown(Int32)" << endl;
     }
+
+    f_decl_ << endl;
+    f_decl_ << indent() << "// MARK: - Properties" << endl;
     f_decl_ << endl;
 
+    // Default enum case.
+    f_decl_ << indent() << "public static var defaultValue: " << tenum->get_name();
+    block_open(f_decl_);
+    f_decl_ << indent() << "return ." << enum_case_name(constants.front()) << endl;
+    block_close(f_decl_);
+
+    f_decl_ << endl;
+    f_decl_ << indent() << "// MARK: - Raw value" << endl;
+    f_decl_ << endl;
+    // rawValue getter
+    f_decl_ << indent() << "public var rawValue: Int32";
+    block_open(f_decl_);
+    f_decl_ << indent() << "switch self";
+    block_open(f_decl_);
+    for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
+        f_decl_ << indent() << "case ." << enum_case_name((*c_iter)) << ":" << endl;
+        indent_up();
+        f_decl_ << indent() << "return " << (*c_iter)->get_value() << endl;
+        indent_down();
+    }
+    if (safe_enums_) {
+        f_decl_ << indent() << "case .unknown(let value):" << endl;
+        indent_up();
+        f_decl_ << indent() << "return value" << endl;
+        indent_down();
+    }
+    block_close(f_decl_);
+    block_close(f_decl_);
+    f_decl_ << endl;
+
+    // convenience rawValue initalizer
+    f_decl_ << indent() << "public init?(rawValue: Int32)";
+    block_open(f_decl_);
+    f_decl_ << indent() << "switch rawValue";
+    block_open(f_decl_);
+    for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
+        f_decl_ << indent() << "case " << (*c_iter)->get_value() << ":" << endl;
+        indent_up();
+        f_decl_ << indent() << "self = ." << enum_case_name((*c_iter)) << endl;
+        indent_down();
+    }
+    if (!safe_enums_) {
+        f_decl_ << indent() << "default:" << endl;
+        indent_up();
+        f_decl_ << indent() << "return nil" << endl;
+        indent_down();
+    } else {
+        f_decl_ << indent() << "default:" << endl;
+        indent_up();
+        f_decl_ << indent() << "self = .unknown(rawValue)" << endl;
+        indent_down();
+    }
+    block_close(f_decl_);
+    block_close(f_decl_);
+
     // TSerializable read(from:)
+    f_decl_ << endl;
+    f_decl_ << indent() << "// MARK: - TSerializable" << endl;
+    f_decl_ << endl;
     f_decl_ << indent() << "public static func read(from sourceProtocol: TProtocol) throws -> "
             << prepend_struct_namespacing(tenum->get_name());
     block_open(f_decl_);
@@ -505,47 +568,7 @@ void t_swift_generator::generate_enum(t_enum *tenum) {
     f_decl_ << indent() << "}" << endl;
     block_close(f_decl_);
 
-    // empty init for TSerializable
     f_decl_ << endl;
-    f_decl_ << indent() << "public init()";
-    block_open(f_decl_);
-
-    f_decl_ << indent() << "self = ." << enum_case_name(constants.front()) << endl;
-    block_close(f_decl_);
-    f_decl_ << endl;
-
-    // rawValue getter
-    f_decl_ << indent() << "public var rawValue: Int32";
-    block_open(f_decl_);
-    f_decl_ << indent() << "switch self {" << endl;
-    for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
-        f_decl_ << indent() << "case ." << enum_case_name((*c_iter))
-                << ": return " << (*c_iter)->get_value() << endl;
-    }
-    if (safe_enums_) {
-        f_decl_ << indent() << "case .unknown(let value): return value" << endl;
-    }
-    f_decl_ << indent() << "}" << endl;
-    block_close(f_decl_);
-    f_decl_ << endl;
-
-    // convenience rawValue initalizer
-    f_decl_ << indent() << "public init?(rawValue: Int32)";
-    block_open(f_decl_);
-    f_decl_ << indent() << "switch rawValue {" << endl;;
-    for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
-        f_decl_ << indent() << "case " << (*c_iter)->get_value()
-                << ": self = ." << enum_case_name((*c_iter)) << endl;
-    }
-    if (!safe_enums_) {
-        f_decl_ << indent() << "default: return nil" << endl;
-    } else {
-        f_decl_ << indent() << "default: self = .unknown(rawValue)" << endl;
-    }
-    f_decl_ << indent() << "}" << endl;
-    block_close(f_decl_);
-
-
     block_close(f_decl_);
     f_decl_ << endl;
 }
@@ -688,13 +711,20 @@ void t_swift_generator::generate_swift_struct(ostream &out,
 
         if (tstruct->is_xception()) {
             out << ": Swift.Error"; // Error seems to be a common exception name in thrift
+
+            if (codable_) {
+                out << ", Codable";
+            }
+        } else if (codable_) {
+            out << ": Codable";
         }
 
         block_open(out);
+        out << endl;
+        out << indent() << "// MARK: - Properties" << endl;
+        out << endl;
         for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
-            out << endl;
             // TODO: Defaults
-
             string doc = (*m_iter)->get_doc();
             generate_docstring(out, doc);
 
@@ -702,8 +732,8 @@ void t_swift_generator::generate_swift_struct(ostream &out,
         }
 
         out << endl;
+        out << indent() << "// MARK: - Initializers" << endl;
         out << endl;
-
         if (!struct_has_required_fields(tstruct)) {
             indent(out) << access_modifier << " init() { }" << endl;
         }
