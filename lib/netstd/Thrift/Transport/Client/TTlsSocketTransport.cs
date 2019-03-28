@@ -1,4 +1,4 @@
-﻿// Licensed to the Apache Software Foundation(ASF) under one
+// Licensed to the Apache Software Foundation(ASF) under one
 // or more contributor license agreements.See the NOTICE file
 // distributed with this work for additional information
 // regarding copyright ownership.The ASF licenses this file
@@ -107,6 +107,36 @@ namespace Thrift.Transport.Client
             _sslProtocols = sslProtocols;
 
             InitSocket();
+        }
+
+        public TTlsSocketTransport(string host, int port, int timeout,
+            X509Certificate2 certificate,
+            RemoteCertificateValidationCallback certValidator = null,
+            LocalCertificateSelectionCallback localCertificateSelectionCallback = null,
+            SslProtocols sslProtocols = SslProtocols.Tls12)
+        {
+            try
+            {
+                var entry = Dns.GetHostEntry(host);
+                if (entry.AddressList.Length == 0)
+                    throw new TTransportException(TTransportException.ExceptionType.Unknown, "unable to resolve host name");
+
+                var addr = entry.AddressList[0];
+
+                _host = new IPAddress(addr.GetAddressBytes(), addr.ScopeId);
+                _port = port;
+                _timeout = timeout;
+                _certificate = certificate;
+                _certValidator = certValidator;
+                _localCertificateSelectionCallback = localCertificateSelectionCallback;
+                _sslProtocols = sslProtocols;
+
+                InitSocket();
+            }
+            catch (SocketException e)
+            {
+                throw new TTransportException(TTransportException.ExceptionType.Unknown, e.Message, e);
+            }
         }
 
         public int Timeout

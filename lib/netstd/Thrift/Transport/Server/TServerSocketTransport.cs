@@ -24,51 +24,26 @@ using Thrift.Transport.Client;
 
 namespace Thrift.Transport.Server
 {
+
     // ReSharper disable once InconsistentNaming
     public class TServerSocketTransport : TServerTransport
     {
         private readonly int _clientTimeout;
-        private readonly int _port;
-        private readonly bool _useBufferedSockets;
-        private readonly bool _useFramedTransport;
         private TcpListener _server;
 
-        public TServerSocketTransport(TcpListener listener)
-            : this(listener, 0)
-        {
-        }
-
-        public TServerSocketTransport(TcpListener listener, int clientTimeout)
+        public TServerSocketTransport(TcpListener listener, int clientTimeout = 0)
         {
             _server = listener;
             _clientTimeout = clientTimeout;
         }
 
-        public TServerSocketTransport(int port)
-            : this(port, 0)
+        public TServerSocketTransport(int port, int clientTimeout = 0)
+            : this(null, clientTimeout)
         {
-        }
-
-        public TServerSocketTransport(int port, int clientTimeout)
-            : this(port, clientTimeout, false)
-        {
-        }
-
-        public TServerSocketTransport(int port, int clientTimeout, bool useBufferedSockets):
-            this(port, clientTimeout, useBufferedSockets, false)
-        {
-        }
-        
-        public TServerSocketTransport(int port, int clientTimeout, bool useBufferedSockets, bool useFramedTransport)
-        {
-            _port = port;
-            _clientTimeout = clientTimeout;
-            _useBufferedSockets = useBufferedSockets;
-            _useFramedTransport = useFramedTransport;
             try
             {
                 // Make server socket
-                _server = new TcpListener(IPAddress.Any, _port);
+                _server = new TcpListener(IPAddress.Any, port);
                 _server.Server.NoDelay = true;
             }
             catch (Exception)
@@ -122,16 +97,6 @@ namespace Thrift.Transport.Server
                     {
                         Timeout = _clientTimeout
                     };
-
-                    if (_useBufferedSockets)
-                    {
-                        tSocketTransport = new TBufferedTransport(tSocketTransport);
-                    }
-
-                    if (_useFramedTransport)
-                    {
-                        tSocketTransport = new TFramedTransport(tSocketTransport);
-                    }
 
                     return tSocketTransport;
                 }

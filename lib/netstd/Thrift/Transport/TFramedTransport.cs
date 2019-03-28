@@ -1,4 +1,4 @@
-﻿// Licensed to the Apache Software Foundation(ASF) under one
+// Licensed to the Apache Software Foundation(ASF) under one
 // or more contributor license agreements.See the NOTICE file
 // distributed with this work for additional information
 // regarding copyright ownership.The ASF licenses this file
@@ -22,8 +22,6 @@ using System.Threading.Tasks;
 
 namespace Thrift.Transport
 {
-    //TODO: check for correct implementation 
-
     // ReSharper disable once InconsistentNaming
     public class TFramedTransport : TTransport
     {

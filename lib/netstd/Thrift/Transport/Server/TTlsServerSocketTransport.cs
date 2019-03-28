@@ -33,34 +33,12 @@ namespace Thrift.Transport.Server
         private readonly RemoteCertificateValidationCallback _clientCertValidator;
         private readonly int _clientTimeout = 0;
         private readonly LocalCertificateSelectionCallback _localCertificateSelectionCallback;
-        private readonly int _port;
         private readonly X509Certificate2 _serverCertificate;
         private readonly SslProtocols _sslProtocols;
-        private readonly bool _useBufferedSockets;
-        private readonly bool _useFramedTransport;
         private TcpListener _server;
-
-        public TTlsServerSocketTransport(int port, X509Certificate2 certificate)
-            : this(port, false, certificate)
-        {
-        }
-
+               
         public TTlsServerSocketTransport(
-            int port,
-            bool useBufferedSockets,
-            X509Certificate2 certificate,
-            RemoteCertificateValidationCallback clientCertValidator = null,
-            LocalCertificateSelectionCallback localCertificateSelectionCallback = null,
-            SslProtocols sslProtocols = SslProtocols.Tls12) 
-            : this(port, useBufferedSockets, false, certificate,
-                clientCertValidator, localCertificateSelectionCallback, sslProtocols)
-        {
-        }
-        
-        public TTlsServerSocketTransport(
-            int port,
-            bool useBufferedSockets,
-            bool useFramedTransport,
+            TcpListener listener,
             X509Certificate2 certificate,
             RemoteCertificateValidationCallback clientCertValidator = null,
             LocalCertificateSelectionCallback localCertificateSelectionCallback = null,
@@ -72,18 +50,25 @@ namespace Thrift.Transport.Server
                     "Your server-certificate needs to have a private key");
             }
 
-            _port = port;
             _serverCertificate = certificate;
-            _useBufferedSockets = useBufferedSockets;
-            _useFramedTransport = useFramedTransport;
             _clientCertValidator = clientCertValidator;
             _localCertificateSelectionCallback = localCertificateSelectionCallback;
             _sslProtocols = sslProtocols;
+            _server = listener;
+        }
 
+        public TTlsServerSocketTransport(
+            int port,
+            X509Certificate2 certificate,
+            RemoteCertificateValidationCallback clientCertValidator = null,
+            LocalCertificateSelectionCallback localCertificateSelectionCallback = null,
+            SslProtocols sslProtocols = SslProtocols.Tls12)
+            : this(null, certificate, clientCertValidator, localCertificateSelectionCallback)
+        {
             try
             {
                 // Create server socket
-                _server = new TcpListener(IPAddress.Any, _port);
+                _server = new TcpListener(IPAddress.Any, port);
                 _server.Server.NoDelay = true;
             }
             catch (Exception)
@@ -136,20 +121,8 @@ namespace Thrift.Transport.Server
                     _localCertificateSelectionCallback, _sslProtocols);
 
                 await tTlsSocket.SetupTlsAsync();
-
-                TTransport trans = tTlsSocket;
                 
-                if (_useBufferedSockets)
-                {
-                    trans = new TBufferedTransport(trans);
-                }
-
-                if (_useFramedTransport)
-                {
-                    trans = new TFramedTransport(trans);
-                }
-                
-                return trans;
+                return tTlsSocket;
             }
             catch (Exception ex)
             {
