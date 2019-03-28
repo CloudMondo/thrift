@@ -812,34 +812,26 @@ void t_swift_generator::generate_swift_struct_hashable_extension(ostream &out,
     indent(out) << "extension " << prepend_struct_namespacing(tstruct->get_name()) << ": Hashable";
     block_open(out);
     out << endl;
-    indent(out) << function_access_modifier(is_private) << " var hashValue : Int";
+    indent(out) << function_access_modifier(is_private) << " func hash(into hasher: inout Hasher)";
     block_open(out);
 
     const vector<t_field *> &members = tstruct->get_members();
     vector<t_field *>::const_iterator m_iter;
 
     if (!members.empty()) {
-        indent(out) << "let prime = 31" << endl;
-        indent(out) << "var result = 1" << endl;
         if (!tstruct->is_union()) {
             for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
                 t_field *tfield = *m_iter;
-                string accessor = field_is_optional(tfield) ? "?." : ".";
-                string defaultor = field_is_optional(tfield) ? " ?? 0" : "";
-                indent(out) << "result = prime &* result &+ (" << sanitize_identifier(tfield->get_name()) << accessor
-                            << "hashValue" << defaultor << ")" << endl;
+                indent(out) << "hasher.combine(" << sanitize_identifier(tfield->get_name()) << ")" << endl;
             }
         } else {
             indent(out) << "switch self {" << endl;
             for (m_iter = members.begin(); m_iter != members.end(); m_iter++) {
                 t_field *tfield = *m_iter;
-                indent(out) << "case ." << tfield->get_name() << "(let val): result = prime &* val.hashValue" << endl;
+                indent(out) << "case let ." << tfield->get_name() << "(value): hasher.combine(value)" << endl;
             }
             indent(out) << "}" << endl << endl;
         }
-        indent(out) << "return result" << endl;
-    } else {
-        indent(out) << "return 31" << endl;
     }
 
     block_close(out);
